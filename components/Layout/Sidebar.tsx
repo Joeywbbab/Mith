@@ -12,9 +12,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
   const [isEditingName, setIsEditingName] = useState(false);
 
   const navItems = [
-    { id: 'projects', label: 'Projects', icon: FolderKanban },
+    { id: 'projects', label: 'Phases', icon: FolderKanban },
     { id: 'plan', label: 'Plan', icon: Calendar },
-    { id: 'someday', label: 'Someday', icon: Layers },
+    { id: 'someday', label: 'Dumping', icon: Layers },
   ];
 
   return (

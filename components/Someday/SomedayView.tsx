@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Excalidraw } from '@excalidraw/excalidraw';
+import '@excalidraw/excalidraw/index.css';
 import { useStore } from '../../context/StoreContext';
-import { Cloud, ArrowRight, ArrowUpCircle, Trash2, Plus, Search, Sparkles, PenLine } from 'lucide-react';
+import { Cloud, ArrowRight, ArrowUpCircle, Trash2, Plus, Search, Sparkles } from 'lucide-react';
 
 // Helper Tooltip Component
 const ActionTooltip = ({ label, children }: { label: string; children: React.ReactNode }) => (
@@ -18,6 +20,12 @@ export const SomedayView: React.FC = () => {
   const { somedayItems, addSomedayItem, updateSomedayItem, deleteSomedayItem, convertToProject, convertToFocus } = useStore();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const lastSerializedNote = useRef<string | null>(null);
+  const [showInlineCanvas, setShowInlineCanvas] = useState(false);
+  const [canvasHeight, setCanvasHeight] = useState(420);
+  const [isResizingCanvas, setIsResizingCanvas] = useState(false);
+  const resizeStartY = useRef(0);
+  const resizeStartHeight = useRef(420);
 
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -34,6 +42,38 @@ export const SomedayView: React.FC = () => {
   const selectedItem = useMemo(() => 
     somedayItems.find(i => i.id === selectedId), 
   [somedayItems, selectedId]);
+
+  const parsedNote = useMemo(() => {
+    if (!selectedItem) return null;
+    try {
+      return selectedItem.canvasData ? JSON.parse(selectedItem.canvasData) : null;
+    } catch {
+      return null;
+    }
+  }, [selectedItem?.id, selectedItem?.canvasData]);
+
+  useEffect(() => {
+    lastSerializedNote.current = selectedItem?.canvasData ?? null;
+    setShowInlineCanvas(!!parsedNote?.elements);
+  }, [parsedNote, selectedItem?.canvasData]);
+
+  useEffect(() => {
+    const handleMove = (e: MouseEvent) => {
+      if (!isResizingCanvas) return;
+      const delta = e.clientY - resizeStartY.current;
+      const next = Math.min(900, Math.max(260, resizeStartHeight.current + delta));
+      setCanvasHeight(next);
+    };
+    const handleUp = () => setIsResizingCanvas(false);
+    if (isResizingCanvas) {
+      document.addEventListener('mousemove', handleMove);
+      document.addEventListener('mouseup', handleUp);
+    }
+    return () => {
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+    };
+  }, [isResizingCanvas]);
 
   const filteredItems = useMemo(() => {
     return somedayItems.filter(i => 
@@ -61,7 +101,7 @@ export const SomedayView: React.FC = () => {
         <div className="h-16 px-6 border-b border-zinc-200 flex items-center justify-between bg-white/50 backdrop-blur-sm">
            <div className="flex items-center gap-2.5 text-zinc-900 font-semibold text-sm">
             <Cloud size={18} className="text-zinc-500" />
-            <span>Someday</span>
+            <span>Dumping</span>
            </div>
            <button 
             onClick={handleCreate}
@@ -173,16 +213,58 @@ export const SomedayView: React.FC = () => {
                 onChange={(e) => updateSomedayItem(selectedItem.id, { title: e.target.value })}
               />
               
-              <div className="flex items-start gap-2 text-zinc-400 mb-6 text-xs uppercase tracking-widest font-semibold px-1">
-                <span>Notes</span>
+              <div className="flex items-center gap-3 mb-4">
+                <span className="px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wide bg-zinc-900 text-white">
+                  Notes
+                </span>
               </div>
 
               <textarea
                 className="w-full h-[calc(100%-200px)] resize-none text-zinc-700 leading-relaxed text-lg placeholder-zinc-200 border-none focus:ring-0 p-1 bg-transparent focus:outline-none font-light"
                 placeholder="Start typing your thoughts..."
                 value={selectedItem.note || ''}
-                onChange={(e) => updateSomedayItem(selectedItem.id, { note: e.target.value })}
-              />
+                onChange={(e) => {
+                    const val = e.target.value;
+                    const lower = val.toLowerCase();
+                    if (lower.endsWith('/canvas') || lower.endsWith('/canva')) {
+                      const trimmed = val.replace(/\/canvas$/i, '').replace(/\/canva$/i, '').trimEnd();
+                      updateSomedayItem(selectedItem.id, { note: trimmed });
+                      setShowInlineCanvas(true);
+                    } else {
+                      updateSomedayItem(selectedItem.id, { note: val });
+                    }
+                  }}
+                />
+
+              {(showInlineCanvas || parsedNote?.elements) && (
+                <div className="mt-6 border border-zinc-200 rounded-xl overflow-hidden shadow-sm" style={{ height: canvasHeight }}>
+                  <Excalidraw
+                    initialData={
+                      parsedNote?.elements
+                        ? { ...parsedNote, appState: { ...(parsedNote.appState || {}), collaborators: [] } }
+                        : { elements: [], appState: { viewBackgroundColor: '#ffffff', collaborators: [] } }
+                    }
+                    onChange={(elements, appState) => {
+                      const safeAppState = { ...appState, collaborators: [] };
+                      const data = JSON.stringify({ elements, appState: safeAppState });
+                      if (data !== lastSerializedNote.current) {
+                        lastSerializedNote.current = data;
+                        updateSomedayItem(selectedItem.id, { canvasData: data });
+                      }
+                    }}
+                  />
+                  <div
+                    className="w-full h-3 bg-zinc-100 hover:bg-zinc-200 cursor-ns-resize flex items-center justify-center text-[10px] text-zinc-500 select-none"
+                    onMouseDown={(e) => {
+                      resizeStartY.current = e.clientY;
+                      resizeStartHeight.current = canvasHeight;
+                      setIsResizingCanvas(true);
+                    }}
+                  >
+                    Drag to resize
+                  </div>
+                </div>
+              )}
             </div>
           </>
         ) : (

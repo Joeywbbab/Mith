@@ -31,7 +31,7 @@ export const CalendarToolbar: React.FC<CalendarToolbarProps> = ({
           </button>
           <button onClick={() => onViewModeChange('week')} className={`p-1.5 px-2 rounded-md transition-all flex items-center gap-2 text-xs font-medium ${viewMode === 'week' ? 'bg-white shadow-sm text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'}`}>
             <LayoutGrid size={14} strokeWidth={2} />
-            <span>Board</span>
+            <span>Week</span>
           </button>
         </div>
         <div className="h-5 w-px bg-zinc-200"></div>

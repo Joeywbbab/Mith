@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Project, Milestone, Focus, SomedayItem, FocusStatus, ProjectType } from '../types';
+import { Project, Milestone, Focus, SomedayItem, Phase, FocusStatus, ProjectType } from '../types';
 import { MOCK_PROJECTS, MOCK_MILESTONES, MOCK_FOCUS, MOCK_SOMEDAY } from '../constants';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -8,11 +8,17 @@ interface StoreContextType {
   milestones: Milestone[];
   focuses: Focus[];
   somedayItems: SomedayItem[];
+  phases: Phase[];
 
   // Projects
   addProject: (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateProject: (id: string, data: Partial<Project>) => void;
   deleteProject: (id: string) => void;
+
+  // Phases
+  addPhase: (phase: Omit<Phase, 'id' | 'createdAt'>) => void;
+  updatePhase: (id: string, data: Partial<Phase>) => void;
+  deletePhase: (id: string) => void;
 
   // Milestones
   addMilestone: (milestone: Omit<Milestone, 'id'>) => void;
@@ -41,8 +47,37 @@ const STORAGE_KEYS = {
   MILESTONES: 'mith_milestones',
   FOCUSES: 'mith_focuses',
   SOMEDAY: 'mith_someday',
+  PHASES: 'mith_phases',
   INITIALIZED: 'mith_initialized'
 };
+
+// Default phases
+const DEFAULT_PHASES: Phase[] = [
+  {
+    id: 'phase1',
+    title: 'Learning',
+    description: '',
+    color: '#ffc9c9',
+    position: 0.15,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'phase2',
+    title: 'Practice',
+    description: '',
+    color: '#b2f2bb',
+    position: 0.45,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'phase3',
+    title: 'Growth',
+    description: '',
+    color: '#a5d8ff',
+    position: 0.75,
+    createdAt: new Date().toISOString(),
+  },
+];
 
 // Helper functions for localStorage
 const loadFromStorage = <T,>(key: string, defaultValue: T): T => {
@@ -86,6 +121,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     loadFromStorage(STORAGE_KEYS.SOMEDAY, MOCK_SOMEDAY)
   );
 
+  const [phases, setPhases] = useState<Phase[]>(() => {
+    const stored = loadFromStorage<Phase[]>(STORAGE_KEYS.PHASES, []);
+    // 如果没有存储的phases，使用默认值
+    if (stored.length === 0) {
+      return DEFAULT_PHASES;
+    }
+    return stored;
+  });
+
   // Persist to localStorage whenever state changes
   useEffect(() => {
     saveToStorage(STORAGE_KEYS.PROJECTS, projects);
@@ -102,6 +146,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     saveToStorage(STORAGE_KEYS.SOMEDAY, somedayItems);
   }, [somedayItems]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.PHASES, phases);
+  }, [phases]);
 
   // --- Projects ---
   const addProject = useCallback((data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -176,6 +224,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setSomedayItems(prev => [...prev, {
       id,
       title,
+      note: '',
+      canvasData: '',
       createdAt: new Date().toISOString(),
     }]);
     return id;
@@ -213,13 +263,41 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [somedayItems, addFocus, deleteSomedayItem]);
 
+  // --- Phases ---
+  const addPhase = useCallback((data: Omit<Phase, 'id' | 'createdAt'>) => {
+    const newPhase: Phase = {
+      ...data,
+      id: uuidv4(),
+      createdAt: new Date().toISOString(),
+    };
+    setPhases(prev => [...prev, newPhase]);
+  }, []);
+
+  const updatePhase = useCallback((id: string, data: Partial<Phase>) => {
+    setPhases(prev => prev.map((p: Phase) => p.id === id ? { ...p, ...data } : p));
+  }, []);
+
+  const deletePhase = useCallback((id: string) => {
+    setPhases(prev => prev.filter((p: Phase) => p.id !== id));
+    setProjects(prev => {
+      const removedProjectIds = prev.filter((p: Project) => p.phaseId === id).map(p => p.id);
+      const kept = prev.filter((p: Project) => p.phaseId !== id);
+      if (removedProjectIds.length) {
+        setMilestones(prevM => prevM.filter((m: Milestone) => !removedProjectIds.includes(m.projectId)));
+        setFocuses(prevF => prevF.filter((f: Focus) => !removedProjectIds.includes(f.projectId || '')));
+      }
+      return kept;
+    });
+  }, []);
+
   return (
     <StoreContext.Provider value={{
-      projects, milestones, focuses, somedayItems,
+      projects, milestones, focuses, somedayItems, phases,
       addProject, updateProject, deleteProject,
       addMilestone, toggleMilestone, deleteMilestone,
       addFocus, updateFocus, deleteFocus, scheduleFocus,
-      addSomedayItem, updateSomedayItem, deleteSomedayItem, convertToProject, convertToFocus
+      addSomedayItem, updateSomedayItem, deleteSomedayItem, convertToProject, convertToFocus,
+      addPhase, updatePhase, deletePhase
     }}>
       {children}
     </StoreContext.Provider>
