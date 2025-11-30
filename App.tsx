@@ -4,6 +4,7 @@ import { ProjectsView } from './components/Projects/ProjectsView';
 import { ProjectPathViewExcalidraw } from './components/Projects/ProjectPathViewExcalidraw';
 import { PlanView } from './components/Plan/PlanView';
 import { SomedayView } from './components/Someday/SomedayView';
+import { CanvaView } from './components/Canva/CanvaView';
 import { StoreProvider } from './context/StoreContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { LayoutGrid, GitBranch } from 'lucide-react';
@@ -32,6 +33,7 @@ const AppContent: React.FC = () => {
         )}
         {activeTab === 'plan' && <PlanView />}
         {activeTab === 'someday' && <SomedayView />}
+        {activeTab === 'canva' && <CanvaView />}
       </main>
     </div>
   );

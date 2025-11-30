@@ -1,4 +1,15 @@
-@import url('https://fonts.googleapis.com/css2?family=Architects+Daughter&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 本地字体定义 */
+@font-face {
+  font-family: 'Architects Daughter';
+  src: url('/fonts/ArchitectsDaughter-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 
 :root {
   --background: oklch(0.9821 0 0);
@@ -265,4 +276,65 @@ body {
 
 .gap-design {
   gap: var(--spacing);
+}
+
+/* BlockNote Editor Custom Styles */
+.bn-editor {
+  font-family: var(--font-sans);
+  letter-spacing: var(--tracking-normal);
+}
+
+.bn-container {
+  border: none !important;
+  background: transparent !important;
+}
+
+/* Align content with title - reduce left padding */
+.bn-editor .bn-block-group {
+  padding-left: 0 !important;
+}
+
+.bn-editor .bn-block-outer {
+  margin-left: 0 !important;
+}
+
+.bn-editor .bn-block-content {
+  font-size: 1rem;
+  line-height: 1.75;
+  padding-left: 0 !important;
+}
+
+/* Move side menu to the left edge */
+.bn-side-menu {
+  left: -50px !important;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.bn-block-outer:hover .bn-side-menu,
+.bn-side-menu:hover {
+  opacity: 1;
+}
+
+/* Toolbar styling */
+.bn-toolbar {
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+/* Block styling */
+.bn-block-outer {
+  margin: 0.25rem 0;
+}
+
+/* Image block styling */
+.bn-image-block-content-wrapper {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* Placeholder text */
+.bn-editor [data-placeholder]::before {
+  color: #a1a1aa;
+  opacity: 0.6;
 }

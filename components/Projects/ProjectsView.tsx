@@ -2,133 +2,16 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { Project, ProjectType, FocusStatus } from '../../types';
 import { Plus, Trash2, CheckCircle2, Circle, Calendar as CalendarIcon, CheckSquare, GraduationCap, Rocket, AlignLeft, MoreHorizontal, ChevronLeft, ChevronRight, X, CornerDownLeft, ChevronDown, Edit2 } from 'lucide-react';
-import { format, addMonths, endOfMonth, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, isToday } from 'date-fns';
-import subMonths from 'date-fns/subMonths';
-import startOfMonth from 'date-fns/startOfMonth';
-import startOfWeek from 'date-fns/startOfWeek';
-
-// --- Custom DatePicker Component (shadcn style) ---
-interface DatePickerProps {
-  date?: string;
-  onSelect: (date: string) => void;
-}
-
-const DatePicker: React.FC<DatePickerProps> = ({ date, onSelect }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [viewDate, setViewDate] = useState(date ? new Date(date) : new Date());
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    if (isOpen) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen]);
-
-  const days = useMemo(() => {
-    const start = startOfWeek(startOfMonth(viewDate));
-    const end = endOfWeek(endOfMonth(viewDate));
-    return eachDayOfInterval({ start, end });
-  }, [viewDate]);
-
-  const handleDayClick = (d: Date) => {
-    onSelect(format(d, 'yyyy-MM-dd'));
-    setIsOpen(false);
-  };
-
-  const handleClear = () => {
-    onSelect('');
-    setIsOpen(false);
-  };
-
-  const handleToday = () => {
-    const today = new Date();
-    onSelect(format(today, 'yyyy-MM-dd'));
-    setViewDate(today);
-    setIsOpen(false);
-  };
-
-  return (
-    <div className="relative" ref={containerRef}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-2 px-3 py-2 w-full text-sm border rounded-md transition-all shadow-sm hover:bg-zinc-50 ${
-          date ? 'text-zinc-900 border-zinc-200' : 'text-zinc-400 border-zinc-200 bg-transparent'
-        }`}
-      >
-        <CalendarIcon size={14} className={date ? 'text-zinc-900' : 'text-zinc-400'} />
-        <span>{date ? format(new Date(date), 'PPP') : 'Pick a date'}</span>
-      </button>
-
-      {isOpen && (
-        <div className="absolute left-0 top-full mt-2 z-50 bg-white border border-zinc-200 rounded-md shadow-lg p-3 w-[280px] animate-in fade-in zoom-in-95 duration-100">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-            <button onClick={() => setViewDate(subMonths(viewDate, 1))} className="p-1 hover:bg-zinc-100 rounded-md text-zinc-500">
-              <ChevronLeft size={14} />
-            </button>
-            <span className="text-sm font-semibold text-zinc-900">
-              {format(viewDate, 'MMMM yyyy')}
-            </span>
-            <button onClick={() => setViewDate(addMonths(viewDate, 1))} className="p-1 hover:bg-zinc-100 rounded-md text-zinc-500">
-              <ChevronRight size={14} />
-            </button>
-          </div>
-
-          {/* Grid */}
-          <div className="grid grid-cols-7 gap-1 text-center mb-1">
-            {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
-              <div key={day} className="text-[10px] text-zinc-400 font-medium uppercase">{day}</div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-1">
-            {days.map(d => {
-              const isCurrentMonth = isSameMonth(d, viewDate);
-              const isSelected = date && isSameDay(d, new Date(date));
-              const isTodayDate = isToday(d);
-              
-              return (
-                <button
-                  key={d.toString()}
-                  onClick={() => handleDayClick(d)}
-                  className={`
-                    h-8 w-8 text-xs rounded-md flex items-center justify-center transition-all
-                    ${!isCurrentMonth ? 'text-zinc-300' : 'text-zinc-700 hover:bg-zinc-100'}
-                    ${isSelected ? 'bg-zinc-900 text-white hover:bg-zinc-800 hover:text-white font-medium' : ''}
-                    ${!isSelected && isTodayDate ? 'text-zinc-900 font-bold bg-zinc-50' : ''}
-                  `}
-                >
-                  {format(d, 'd')}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Footer */}
-          <div className="flex items-center justify-between mt-4 pt-2 border-t border-zinc-100">
-            <button onClick={handleClear} className="text-xs text-zinc-500 hover:text-zinc-900 px-2 py-1 rounded hover:bg-zinc-100">
-              Clear
-            </button>
-            <button onClick={handleToday} className="text-xs text-zinc-900 font-medium hover:bg-zinc-100 px-2 py-1 rounded">
-              Today
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+import { format } from 'date-fns';
+import { DatePicker } from './DatePicker';
 
 // --- Main Component ---
 
 export const ProjectsView: React.FC = () => {
-  const { 
+  const {
     projects, milestones, focuses, phases,
     addProject, deleteProject, updateProject,
-    addMilestone, toggleMilestone, deleteMilestone,
+    addMilestone, toggleMilestone, deleteMilestone, updateMilestone,
     addFocus, updateFocus, deleteFocus,
     addPhase, updatePhase, deletePhase
   } = useStore();
@@ -644,24 +527,25 @@ export const ProjectsView: React.FC = () => {
                                     <div className="text-center py-4 text-zinc-300 text-xs italic">No milestones yet.</div>
                                 )}
                                 {projectMilestones.map(m => (
-                                <div key={m.id} className="group relative flex items-start py-1.5 pr-6 hover:bg-zinc-50 rounded-md transition-colors -mx-2 px-2">
-                                    <button 
+                                <div key={m.id} className="group relative flex items-center py-1.5 pr-14 hover:bg-zinc-50 rounded-md transition-colors -mx-2 px-2">
+                                    <button
                                         onClick={() => toggleMilestone(m.id)}
-                                        className={`mt-0.5 mr-3 transition-colors ${m.isDone ? 'text-zinc-800' : 'text-zinc-300 hover:text-zinc-400'}`}
+                                        className={`mr-3 transition-colors ${m.isDone ? 'text-zinc-800' : 'text-zinc-300 hover:text-zinc-400'}`}
                                     >
                                         {m.isDone ? <CheckCircle2 size={16} /> : <Circle size={16} />}
                                     </button>
-                                    <div className="flex-1 min-w-0">
-                                        <div className={`text-sm font-medium transition-all truncate ${m.isDone ? 'text-zinc-400 line-through decoration-zinc-300' : 'text-zinc-800'}`}>
-                                            {m.title}
-                                        </div>
-                                        {m.dueDate && (
-                                            <div className="text-[10px] text-zinc-400">
-                                                {new Date(m.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <button onClick={() => deleteMilestone(m.id)} className="absolute right-1 top-2 text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <input
+                                        className={`flex-1 min-w-0 text-sm font-medium transition-all bg-transparent border-none p-0 focus:ring-0 focus:outline-none ${m.isDone ? 'text-zinc-400 line-through decoration-zinc-300' : 'text-zinc-800'}`}
+                                        value={m.title}
+                                        onChange={(e) => updateMilestone(m.id, { title: e.target.value })}
+                                        placeholder="Milestone title..."
+                                    />
+                                    <DatePicker
+                                        date={m.dueDate}
+                                        onSelect={(date) => updateMilestone(m.id, { dueDate: date })}
+                                        compact
+                                    />
+                                    <button onClick={() => deleteMilestone(m.id)} className="absolute right-1 top-1/2 -translate-y-1/2 text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <Trash2 size={13} />
                                     </button>
                                 </div>

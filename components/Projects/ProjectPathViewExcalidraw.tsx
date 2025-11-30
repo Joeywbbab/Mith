@@ -27,7 +27,7 @@ const MIN_PHASE_SPACING = 0.18;
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 export const ProjectPathViewExcalidraw: React.FC = () => {
-  const { projects, phases: storePhases, focuses, milestones, addPhase, addProject, deleteProject, deletePhase, updateProject } = useStore();
+  const { projects, phases: storePhases, focuses, milestones, addPhase, addProject, deleteProject, deletePhase, updateProject, updateMilestone } = useStore();
   const svgRef = useRef<SVGSVGElement>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
@@ -558,14 +558,51 @@ export const ProjectPathViewExcalidraw: React.FC = () => {
               block.appendChild(header);
               projectMilestones.slice(0, 3).forEach((m) => {
                 const row = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
-                row.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12px;color:#27272a;';
+                row.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:12px;color:#27272a;margin-bottom:4px;';
+                
+                // Dot indicator
                 const dot = document.createElementNS('http://www.w3.org/1999/xhtml', 'span');
-                dot.style.cssText = `width:6px;height:6px;border-radius:50%;display:inline-block;background:${m.isDone ? '#22c55e' : '#a1a1aa'};`;
+                dot.style.cssText = `width:6px;height:6px;border-radius:50%;display:inline-block;background:${m.isDone ? '#22c55e' : '#a1a1aa'};flex-shrink:0;`;
                 row.appendChild(dot);
-                const text = document.createElementNS('http://www.w3.org/1999/xhtml', 'span');
-                text.textContent = m.title;
-                if (m.isDone) text.style.textDecoration = 'line-through';
-                row.appendChild(text);
+                
+                // Editable title input
+                const titleInput = document.createElementNS('http://www.w3.org/1999/xhtml', 'input');
+                titleInput.type = 'text';
+                titleInput.value = m.title;
+                titleInput.style.cssText = 'flex:1;font-size:12px;color:#27272a;border:none;outline:none;background:transparent;padding:2px 4px;border-radius:2px;';
+                if (m.isDone) titleInput.style.textDecoration = 'line-through';
+                titleInput.style.textDecorationColor = '#a1a1aa';
+                titleInput.oninput = (e) => {
+                  const value = (e.target as HTMLInputElement).value;
+                  updateMilestone(m.id, { title: value });
+                };
+                row.appendChild(titleInput);
+                
+                // Date input (if dueDate exists or can be added)
+                if (m.dueDate) {
+                  const dateInput = document.createElementNS('http://www.w3.org/1999/xhtml', 'input');
+                  dateInput.type = 'date';
+                  dateInput.value = m.dueDate;
+                  dateInput.style.cssText = 'font-size:10px;color:#71717a;border:1px solid #e4e4e7;border-radius:3px;padding:1px 4px;background:white;width:90px;flex-shrink:0;';
+                  dateInput.onchange = (e) => {
+                    const value = (e.target as HTMLInputElement).value;
+                    updateMilestone(m.id, { dueDate: value || undefined });
+                  };
+                  row.appendChild(dateInput);
+                } else {
+                  // Add date button
+                  const addDateBtn = document.createElementNS('http://www.w3.org/1999/xhtml', 'button');
+                  addDateBtn.textContent = '+ date';
+                  addDateBtn.style.cssText = 'font-size:10px;color:#71717a;border:none;background:transparent;cursor:pointer;padding:1px 4px;opacity:0.6;';
+                  addDateBtn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const today = new Date().toISOString().split('T')[0];
+                    updateMilestone(m.id, { dueDate: today });
+                  };
+                  row.appendChild(addDateBtn);
+                }
+                
                 block.appendChild(row);
               });
               wrapper.appendChild(block);
@@ -607,7 +644,7 @@ export const ProjectPathViewExcalidraw: React.FC = () => {
         console.error('Path view render error', err);
       }
     }
-  }, [layout, pathPoints, focuses, milestones, selectedProjectId]);
+  }, [layout, pathPoints, focuses, milestones, selectedProjectId, updateProject, updateMilestone]);
 
   const getViewBox = () => {
     const scaledWidth = CANVAS_WIDTH / viewport.zoom;

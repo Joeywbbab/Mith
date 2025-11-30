@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CheckCircle2, Circle, Trash2, Plus } from 'lucide-react';
 import { Milestone } from '../../types';
+import { DatePicker } from './DatePicker';
 
 interface MilestoneListProps {
   milestones: Milestone[];
@@ -8,6 +9,7 @@ interface MilestoneListProps {
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
   onAdd: (data: Omit<Milestone, 'id'>) => void;
+  onUpdate?: (id: string, data: Partial<Milestone>) => void;
 }
 
 export const MilestoneList: React.FC<MilestoneListProps> = ({
@@ -15,7 +17,8 @@ export const MilestoneList: React.FC<MilestoneListProps> = ({
   projectId,
   onToggle,
   onDelete,
-  onAdd
+  onAdd,
+  onUpdate
 }) => {
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
@@ -39,24 +42,39 @@ export const MilestoneList: React.FC<MilestoneListProps> = ({
           <div className="text-center py-4 text-zinc-300 text-xs italic">No milestones yet.</div>
       )}
       {milestones.map(m => (
-        <div key={m.id} className="group relative flex items-start py-1.5 pr-6 hover:bg-zinc-50 rounded-md transition-colors -mx-2 px-2">
+        <div key={m.id} className="group relative flex items-center py-1.5 pr-14 hover:bg-zinc-50 rounded-md transition-colors -mx-2 px-2">
             <button
                 onClick={() => onToggle(m.id)}
-                className={`mt-0.5 mr-3 transition-colors ${m.isDone ? 'text-zinc-800' : 'text-zinc-300 hover:text-zinc-400'}`}
+                className={`mr-3 transition-colors ${m.isDone ? 'text-zinc-800' : 'text-zinc-300 hover:text-zinc-400'}`}
             >
                 {m.isDone ? <CheckCircle2 size={16} /> : <Circle size={16} />}
             </button>
-            <div className="flex-1 min-w-0">
-                <div className={`text-sm font-medium transition-all truncate ${m.isDone ? 'text-zinc-400 line-through decoration-zinc-300' : 'text-zinc-800'}`}>
+            {onUpdate ? (
+                <input
+                    className={`flex-1 min-w-0 text-sm font-medium transition-all bg-transparent border-none p-0 focus:ring-0 focus:outline-none ${m.isDone ? 'text-zinc-400 line-through decoration-zinc-300' : 'text-zinc-800'}`}
+                    value={m.title}
+                    onChange={(e) => onUpdate(m.id, { title: e.target.value })}
+                    placeholder="Milestone title..."
+                />
+            ) : (
+                <div className={`flex-1 min-w-0 text-sm font-medium transition-all truncate ${m.isDone ? 'text-zinc-400 line-through decoration-zinc-300' : 'text-zinc-800'}`}>
                     {m.title}
                 </div>
-                {m.dueDate && (
+            )}
+            {onUpdate ? (
+                <DatePicker
+                    date={m.dueDate}
+                    onSelect={(selectedDate) => onUpdate(m.id, { dueDate: selectedDate })}
+                    compact
+                />
+            ) : (
+                m.dueDate && (
                     <div className="text-[10px] text-zinc-400">
                         {new Date(m.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                     </div>
-                )}
-            </div>
-            <button onClick={() => onDelete(m.id)} className="absolute right-1 top-2 text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                )
+            )}
+            <button onClick={() => onDelete(m.id)} className="absolute right-1 top-1/2 -translate-y-1/2 text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Trash2 size={13} />
             </button>
         </div>
@@ -72,12 +90,12 @@ export const MilestoneList: React.FC<MilestoneListProps> = ({
             onChange={e => setTitle(e.target.value)}
           />
           {title && (
-            <input
-              type="date"
-              className="px-2 py-0.5 text-[10px] border border-zinc-200 rounded-md bg-white text-zinc-500 focus:ring-0 focus:border-zinc-300"
-              value={date}
-              onChange={e => setDate(e.target.value)}
-            />
+            <div className="w-[140px]">
+              <DatePicker
+                date={date || undefined}
+                onSelect={(selectedDate) => setDate(selectedDate)}
+              />
+            </div>
           )}
           <button type="submit" className="hidden">Add</button>
         </form>

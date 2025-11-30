@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Target, Plus, GripVertical, CornerDownLeft } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Target, Plus, GripVertical, CornerDownLeft, ChevronDown, Rocket, Lightbulb, Trash2 } from 'lucide-react';
 import { Focus, Project } from '../../types';
 import { FilterPopover } from './FilterPopover';
 
@@ -9,9 +9,14 @@ interface FocusSidebarProps {
   projectFilter: string;
   onFilterChange: (filterId: string) => void;
   onDragStart: (e: React.DragEvent, focusId: string) => void;
+  onDragEnd: () => void;
   onDragOver: (e: React.DragEvent) => void;
+  onDragEnterBacklog: () => void;
   onDrop: (e: React.DragEvent) => void;
   onAddFocus: (title: string) => void;
+  onUpdateFocus: (id: string, data: Partial<Focus>) => void;
+  onDeleteFocus: (id: string) => void;
+  onReorderFocuses: (focusIds: string[]) => void;
 }
 
 export const FocusSidebar: React.FC<FocusSidebarProps> = ({
@@ -20,13 +25,91 @@ export const FocusSidebar: React.FC<FocusSidebarProps> = ({
   projectFilter,
   onFilterChange,
   onDragStart,
+  onDragEnd,
   onDragOver,
+  onDragEnterBacklog,
   onDrop,
-  onAddFocus
+  onAddFocus,
+  onUpdateFocus,
+  onDeleteFocus,
+  onReorderFocuses
 }) => {
   const [quickFocusTitle, setQuickFocusTitle] = useState('');
   const [isAddingSideTask, setIsAddingSideTask] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [reorderDragId, setReorderDragId] = useState<string | null>(null);
+  const [reorderOverId, setReorderOverId] = useState<string | null>(null);
   const quickFocusInputRef = useRef<HTMLInputElement>(null);
+
+  // Sort focuses by sortOrder, then group by project-related vs independent
+  const groupedFocuses = useMemo(() => {
+    const sorted = [...focuses].sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
+    const projectFocuses = sorted.filter(f => f.projectId);
+    const independentFocuses = sorted.filter(f => !f.projectId);
+    return { projectFocuses, independentFocuses };
+  }, [focuses]);
+
+  // Handle reorder drag start (internal reordering)
+  const handleReorderDragStart = (e: React.DragEvent, focusId: string) => {
+    setReorderDragId(focusId);
+    e.dataTransfer.setData('reorderFocusId', focusId);
+    e.dataTransfer.effectAllowed = 'move';
+    // Also call parent's onDragStart for calendar drag
+    onDragStart(e, focusId);
+  };
+
+  // Handle reorder drag over
+  const handleReorderDragOver = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (reorderDragId && reorderDragId !== targetId) {
+      setReorderOverId(targetId);
+    }
+  };
+
+  // Handle reorder drop
+  const handleReorderDrop = (e: React.DragEvent, targetId: string, groupFocuses: Focus[]) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!reorderDragId || reorderDragId === targetId) {
+      setReorderDragId(null);
+      setReorderOverId(null);
+      return;
+    }
+
+    // Find positions
+    const dragIndex = groupFocuses.findIndex(f => f.id === reorderDragId);
+    const targetIndex = groupFocuses.findIndex(f => f.id === targetId);
+
+    if (dragIndex === -1 || targetIndex === -1) {
+      setReorderDragId(null);
+      setReorderOverId(null);
+      return;
+    }
+
+    // Reorder the array
+    const newOrder = [...groupFocuses];
+    const [removed] = newOrder.splice(dragIndex, 1);
+    newOrder.splice(targetIndex, 0, removed);
+
+    // Call reorder with new order of IDs
+    onReorderFocuses(newOrder.map(f => f.id));
+
+    setReorderDragId(null);
+    setReorderOverId(null);
+  };
+
+  // Handle reorder drag end
+  const handleReorderDragEnd = () => {
+    setReorderDragId(null);
+    setReorderOverId(null);
+    onDragEnd();
+  };
+
+  const toggleGroup = (groupId: string) => {
+    setCollapsedGroups(prev => ({ ...prev, [groupId]: !prev[groupId] }));
+  };
 
   useEffect(() => {
     if (isAddingSideTask) {
@@ -49,11 +132,14 @@ export const FocusSidebar: React.FC<FocusSidebarProps> = ({
 
   return (
     <div
-      className="w-[280px] border-r border-zinc-200 bg-zinc-50/30 flex flex-col z-10 shrink-0"
+      className="w-[280px] border-r border-zinc-200 bg-zinc-50/30 flex flex-col z-30 shrink-0 relative"
+      data-backlog-dropzone="true"
       onDragOver={onDragOver}
+      onDragEnter={(e) => { onDragOver(e); onDragEnterBacklog(); }}
       onDrop={onDrop}
+      onMouseUp={onDragEnd}
     >
-      <div className="p-4 border-b border-zinc-200 bg-white/50 backdrop-blur-sm flex items-center justify-between">
+      <div className="p-4 border-b border-zinc-200 bg-white/50 backdrop-blur-sm flex items-center justify-between relative z-10">
           <h2 className="font-semibold text-sm text-zinc-900 flex items-center gap-2">
             <Target size={16} className="text-zinc-500" />
             Focus
@@ -75,29 +161,123 @@ export const FocusSidebar: React.FC<FocusSidebarProps> = ({
           </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 space-y-1.5 min-h-0">
-        {focuses.map(focus => (
-          <div
-            key={focus.id}
-            draggable
-            onDragStart={(e) => onDragStart(e, focus.id)}
-            className="group p-3 bg-white rounded-lg border border-zinc-200 shadow-sm cursor-move hover:border-zinc-300 hover:shadow-md transition-all select-none active:cursor-grabbing flex flex-col gap-1"
-          >
-            <div className="flex items-start gap-2">
-              <GripVertical size={14} className="text-zinc-300 mt-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-zinc-800 leading-snug truncate">{focus.title}</p>
-                {focus.projectId && (
-                  <div className="mt-1.5 flex">
-                      <span className="text-[9px] font-medium text-zinc-500 px-1.5 py-0.5 bg-zinc-100 rounded border border-zinc-100 truncate max-w-full">
-                      {getProjectName(focus.projectId)}
-                      </span>
+      <div className="flex-1 overflow-y-auto p-2 min-h-0">
+        {/* Project Related Group */}
+        {groupedFocuses.projectFocuses.length > 0 && (
+          <div className="mb-3">
+            <button
+              onClick={() => toggleGroup('project')}
+              className="w-full flex items-center gap-2 px-2 py-1.5 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider hover:bg-zinc-100 rounded-md transition-colors"
+            >
+              <ChevronDown
+                size={12}
+                className={`transition-transform ${collapsedGroups['project'] ? '-rotate-90' : ''}`}
+              />
+              <Rocket size={12} />
+              <span>Project Tasks</span>
+              <span className="ml-auto text-zinc-400 font-normal bg-zinc-100 px-1.5 py-0.5 rounded text-[9px]">
+                {groupedFocuses.projectFocuses.length}
+              </span>
+            </button>
+            {!collapsedGroups['project'] && (
+              <div className="mt-1.5 space-y-1.5">
+                {groupedFocuses.projectFocuses.map(focus => (
+                  <div
+                    key={focus.id}
+                    draggable
+                    onDragStart={(e) => handleReorderDragStart(e, focus.id)}
+                    onDragEnd={handleReorderDragEnd}
+                    onDragOver={(e) => handleReorderDragOver(e, focus.id)}
+                    onDrop={(e) => handleReorderDrop(e, focus.id, groupedFocuses.projectFocuses)}
+                    className={`group relative p-3 pr-8 bg-white rounded-lg border shadow-sm cursor-move hover:border-zinc-300 hover:shadow-md transition-all select-none active:cursor-grabbing flex flex-col gap-1 ${
+                      reorderOverId === focus.id ? 'border-zinc-400 border-t-2' : 'border-zinc-200'
+                    } ${reorderDragId === focus.id ? 'opacity-50' : ''}`}
+                  >
+                    <div className="flex items-start gap-2">
+                      <GripVertical size={14} className="text-zinc-300 mt-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div className="flex-1 min-w-0">
+                        <input
+                          className="w-full text-sm font-medium text-zinc-800 leading-snug bg-transparent border-none p-0 focus:ring-0 focus:outline-none truncate"
+                          value={focus.title}
+                          onChange={(e) => onUpdateFocus(focus.id, { title: e.target.value })}
+                          onClick={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          placeholder="Focus title..."
+                        />
+                        <div className="mt-1.5 flex">
+                          <span className="text-[9px] font-medium text-zinc-500 px-1.5 py-0.5 bg-zinc-100 rounded border border-zinc-100 truncate max-w-full">
+                            {getProjectName(focus.projectId)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDeleteFocus(focus.id); }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 size={13} />
+                    </button>
                   </div>
-                )}
+                ))}
               </div>
-            </div>
+            )}
           </div>
-        ))}
+        )}
+
+        {/* Independent Tasks Group */}
+        {groupedFocuses.independentFocuses.length > 0 && (
+          <div className="mb-3">
+            <button
+              onClick={() => toggleGroup('independent')}
+              className="w-full flex items-center gap-2 px-2 py-1.5 text-[10px] font-semibold text-zinc-500 uppercase tracking-wider hover:bg-zinc-100 rounded-md transition-colors"
+            >
+              <ChevronDown
+                size={12}
+                className={`transition-transform ${collapsedGroups['independent'] ? '-rotate-90' : ''}`}
+              />
+              <Lightbulb size={12} />
+              <span>Quick Tasks</span>
+              <span className="ml-auto text-zinc-400 font-normal bg-zinc-100 px-1.5 py-0.5 rounded text-[9px]">
+                {groupedFocuses.independentFocuses.length}
+              </span>
+            </button>
+            {!collapsedGroups['independent'] && (
+              <div className="mt-1.5 space-y-1.5">
+                {groupedFocuses.independentFocuses.map(focus => (
+                  <div
+                    key={focus.id}
+                    draggable
+                    onDragStart={(e) => handleReorderDragStart(e, focus.id)}
+                    onDragEnd={handleReorderDragEnd}
+                    onDragOver={(e) => handleReorderDragOver(e, focus.id)}
+                    onDrop={(e) => handleReorderDrop(e, focus.id, groupedFocuses.independentFocuses)}
+                    className={`group relative p-3 pr-8 bg-white rounded-lg border shadow-sm cursor-move hover:border-zinc-300 hover:shadow-md transition-all select-none active:cursor-grabbing ${
+                      reorderOverId === focus.id ? 'border-zinc-400 border-t-2' : 'border-zinc-200'
+                    } ${reorderDragId === focus.id ? 'opacity-50' : ''}`}
+                  >
+                    <div className="flex items-start gap-2">
+                      <GripVertical size={14} className="text-zinc-300 mt-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <input
+                        className="flex-1 min-w-0 text-sm font-medium text-zinc-800 leading-snug bg-transparent border-none p-0 focus:ring-0 focus:outline-none truncate"
+                        value={focus.title}
+                        onChange={(e) => onUpdateFocus(focus.id, { title: e.target.value })}
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        placeholder="Focus title..."
+                      />
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDeleteFocus(focus.id); }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {isAddingSideTask && (
            <div className="p-3 bg-white border border-zinc-200 rounded-lg shadow-sm animate-in slide-in-from-top-2 duration-200 mb-2">

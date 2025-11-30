@@ -22,9 +22,12 @@ export interface Focus {
   id: string;
   title: string;
   projectId?: string;
-  scheduledDate?: string; // ISO String YYYY-MM-DD
+  scheduledDate?: string; // ISO String YYYY-MM-DD (deprecated, use startDate instead, kept for backward compatibility)
+  startDate?: string; // ISO String YYYY-MM-DD (start date of the task)
+  endDate?: string; // ISO String YYYY-MM-DD (end date of the task, if not set, task is single-day)
   status: FocusStatus;
   note?: string;
+  sortOrder?: number; // For custom ordering in backlog
   createdAt: string;
   updatedAt: string;
 }
@@ -48,6 +51,7 @@ export interface SomedayItem {
   title: string;
   note?: string;
   canvasData?: string;
+  isPinned?: boolean;
   createdAt: string;
 }
 
@@ -63,3 +67,10 @@ export interface Phase {
 }
 
 export type ViewMode = 'month' | 'week';
+
+// Canva (Excalidraw) data type
+export interface CanvaData {
+  elements: readonly any[]; // Excalidraw elements
+  appState?: Record<string, any>; // Excalidraw app state (optional)
+  files?: Record<string, any>; // Excalidraw binary files (optional)
+}

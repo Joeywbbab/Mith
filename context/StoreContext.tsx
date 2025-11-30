@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Project, Milestone, Focus, SomedayItem, Phase, FocusStatus, ProjectType } from '../types';
+import { Project, Milestone, Focus, SomedayItem, Phase, FocusStatus, ProjectType, CanvaData } from '../types';
 import { MOCK_PROJECTS, MOCK_MILESTONES, MOCK_FOCUS, MOCK_SOMEDAY } from '../constants';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -9,6 +9,7 @@ interface StoreContextType {
   focuses: Focus[];
   somedayItems: SomedayItem[];
   phases: Phase[];
+  canvaData: CanvaData;
 
   // Projects
   addProject: (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => void;
@@ -22,6 +23,7 @@ interface StoreContextType {
 
   // Milestones
   addMilestone: (milestone: Omit<Milestone, 'id'>) => void;
+  updateMilestone: (id: string, data: Partial<Milestone>) => void;
   toggleMilestone: (id: string) => void;
   deleteMilestone: (id: string) => void;
 
@@ -29,7 +31,8 @@ interface StoreContextType {
   addFocus: (focus: Omit<Focus, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateFocus: (id: string, data: Partial<Focus>) => void;
   deleteFocus: (id: string) => void;
-  scheduleFocus: (id: string, date: string) => void;
+  scheduleFocus: (id: string, date: string, endDate?: string) => void;
+  reorderFocuses: (focusIds: string[]) => void;
 
   // Someday
   addSomedayItem: (title: string) => string;
@@ -37,6 +40,9 @@ interface StoreContextType {
   deleteSomedayItem: (id: string) => void;
   convertToProject: (id: string) => void;
   convertToFocus: (id: string) => void;
+
+  // Canva
+  updateCanvaData: (data: CanvaData) => void;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -48,6 +54,7 @@ const STORAGE_KEYS = {
   FOCUSES: 'mith_focuses',
   SOMEDAY: 'mith_someday',
   PHASES: 'mith_phases',
+  CANVA: 'mith_canva',
   INITIALIZED: 'mith_initialized'
 };
 
@@ -130,6 +137,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return stored;
   });
 
+  const [canvaData, setCanvaData] = useState<CanvaData>(() =>
+    loadFromStorage(STORAGE_KEYS.CANVA, { elements: [] })
+  );
+
   // Persist to localStorage whenever state changes
   useEffect(() => {
     saveToStorage(STORAGE_KEYS.PROJECTS, projects);
@@ -150,6 +161,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     saveToStorage(STORAGE_KEYS.PHASES, phases);
   }, [phases]);
+
+  useEffect(() => {
+    saveToStorage(STORAGE_KEYS.CANVA, canvaData);
+  }, [canvaData]);
 
   // --- Projects ---
   const addProject = useCallback((data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -178,6 +193,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setMilestones(prev => [...prev, { ...data, id: uuidv4() }]);
   }, []);
 
+  const updateMilestone = useCallback((id: string, data: Partial<Milestone>) => {
+    setMilestones(prev => prev.map((m: Milestone) => m.id === id ? { ...m, ...data } : m));
+  }, []);
+
   const toggleMilestone = useCallback((id: string) => {
     setMilestones(prev => prev.map((m: Milestone) => m.id === id ? { ...m, isDone: !m.isDone } : m));
   }, []);
@@ -204,18 +223,33 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setFocuses(prev => prev.filter((f: Focus) => f.id !== id));
   }, []);
 
-  const scheduleFocus = useCallback((id: string, date: string) => {
+  const scheduleFocus = useCallback((id: string, date: string, endDate?: string) => {
     setFocuses(prev => prev.map((f: Focus) => {
       if (f.id === id) {
         return {
           ...f,
-          scheduledDate: date,
+          scheduledDate: date, // Keep for backward compatibility
+          startDate: date,
+          endDate: endDate || date, // If no endDate, use startDate (single-day task)
           status: FocusStatus.Scheduled,
           updatedAt: new Date().toISOString()
         };
       }
       return f;
     }));
+  }, []);
+
+  const reorderFocuses = useCallback((focusIds: string[]) => {
+    setFocuses(prev => {
+      const now = new Date().toISOString();
+      return prev.map((f: Focus) => {
+        const newOrder = focusIds.indexOf(f.id);
+        if (newOrder !== -1) {
+          return { ...f, sortOrder: newOrder, updatedAt: now };
+        }
+        return f;
+      });
+    });
   }, []);
 
   // --- Someday ---
@@ -290,14 +324,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   }, []);
 
+  // --- Canva ---
+  const updateCanvaData = useCallback((data: CanvaData) => {
+    setCanvaData(data);
+  }, []);
+
   return (
     <StoreContext.Provider value={{
-      projects, milestones, focuses, somedayItems, phases,
+      projects, milestones, focuses, somedayItems, phases, canvaData,
       addProject, updateProject, deleteProject,
-      addMilestone, toggleMilestone, deleteMilestone,
-      addFocus, updateFocus, deleteFocus, scheduleFocus,
+      addMilestone, updateMilestone, toggleMilestone, deleteMilestone,
+      addFocus, updateFocus, deleteFocus, scheduleFocus, reorderFocuses,
       addSomedayItem, updateSomedayItem, deleteSomedayItem, convertToProject, convertToFocus,
-      addPhase, updatePhase, deletePhase
+      addPhase, updatePhase, deletePhase,
+      updateCanvaData
     }}>
       {children}
     </StoreContext.Provider>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { FolderKanban, Calendar, Layers, Command, ChevronLeft, ChevronRight, Edit2, Check } from 'lucide-react';
+import { FolderKanban, Calendar, Layers, Pencil, ChevronLeft, ChevronRight, Edit2, Check } from 'lucide-react';
+import appIcon from '../../src-tauri/icons/icon.png';
 
 interface SidebarProps {
   activeTab: string;
@@ -15,6 +16,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
     { id: 'projects', label: 'Phases', icon: FolderKanban },
     { id: 'plan', label: 'Plan', icon: Calendar },
     { id: 'someday', label: 'Dumping', icon: Layers },
+    { id: 'canva', label: 'Canva', icon: Pencil },
   ];
 
   return (
@@ -32,8 +34,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
       {/* Header / Workspace Switcher */}
       <div className={`h-16 flex items-center ${isCollapsed ? 'justify-center px-0' : 'px-5'} border-b border-zinc-100/50 transition-all`}>
         <div className="flex items-center gap-3 text-zinc-900 font-semibold text-sm tracking-tight overflow-hidden whitespace-nowrap">
-          <div className="w-8 h-8 bg-zinc-900 rounded-lg text-white flex items-center justify-center shadow-sm flex-shrink-0">
-            <Command size={14} strokeWidth={3} />
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0 overflow-hidden">
+            <img src={appIcon} alt="Mith" className="w-full h-full object-cover" />
           </div>
           
           {!isCollapsed && (
